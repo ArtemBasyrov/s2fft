@@ -1,4 +1,5 @@
 from functools import partial
+from warnings import warn
 
 import jax
 import jax.numpy as jnp
@@ -8,7 +9,16 @@ from jax import jit, vmap
 # did not find promote_dtypes_complex outside _src
 from jax._src.numpy.util import promote_dtypes_complex
 from jax.core import ShapedArray
-from s2fft_lib import _s2fft
+
+try:
+    from s2fft_lib import _s2fft
+except ImportError:
+    # s2fft_lib is a compiled extension module containing CUDA kernels for more
+    # efficient HEALPix FFTs. As extension module may not compile on all
+    # systems we guard import here to allow still using the package when the
+    # module is not available
+    warn("s2fft_lib extension module not available", stacklevel=-2)
+    _s2fft = None
 
 from s2fft.sampling import s2_samples as samples
 from s2fft.utils.jax_primitive import register_primitive
@@ -636,12 +646,33 @@ def _healpix_fft_cuda_abstract(f, L, nside, reality, fft_type, norm, adjoint):
     )
 
 
-class MissingCUDASupport(Exception):  # noqa : D107
-    def __init__(self):  # noqa : D107
-        super().__init__("""
-                        S2FFT was compiled without CUDA support. Cuda functions are not supported.
-                        Please make sure that nvcc is in your path and $CUDA_HOME is set then reinstall s2fft using pip.
-                        """)
+class MissingCUDASupport(Exception):  # noqa: D101
+    def __init__(self):  # noqa: D107
+        super().__init__(
+            "S2FFT was compiled without CUDA support. CUDA functions are not supported. "
+            "Please make sure that nvcc is in your path and $CUDA_HOME is set then "
+            "reinstall s2fft using pip."
+        )
+
+
+class MissingExtensionModule(Exception):  # noqa: D101
+    def __init__(self):  # noqa: D107
+        super().__init__(
+            "The s2fft_lib extension module is not available. This is likely due to it "
+            "not being built successfully when the package was installed."
+        )
+
+
+def _check_extension_module():
+    """
+    Checks s2fft_lib extension module is available and compiled with CUDA support.
+
+    If not true and appropriate error is raised.
+    """
+    if _s2fft is None:
+        raise MissingExtensionModule()
+    elif not _s2fft.COMPILED_WITH_CUDA:
+        raise MissingCUDASupport()
 
 
 def _healpix_fft_cuda_lowering(ctx, f, *, L, nside, reality, fft_type, norm, adjoint):
@@ -663,17 +694,13 @@ def _healpix_fft_cuda_lowering(ctx, f, *, L, nside, reality, fft_type, norm, adj
         The result of the FFI call.
 
     """
-    # Step 1: Check if CUDA support is compiled in.
-    if not _s2fft.COMPILED_WITH_CUDA:
-        raise MissingCUDASupport()
-
-    # Step 2: Get the abstract evaluation results for the outputs.
+    # Step 1: Get the abstract evaluation results for the outputs.
     (_, aval_out, _) = ctx.avals_out
 
-    # Step 3: Get lowering information (double precision, forward/backward, normalize).
+    # Step 2: Get lowering information (double precision, forward/backward, normalize).
     is_double, forward, normalize = _get_lowering_info(fft_type, norm, aval_out.dtype)
 
-    # Step 4: Select the appropriate FFI lowering function based on precision.
+    # Step 3: Select the appropriate FFI lowering function based on precision.
     # We use operand_output_aliases={0: 0} to tell XLA that the input buffer (operand 0)
     # can be reused for the output buffer (output 0). This allows XLA to perform the
     # operation in-place if possible. Crucially, JAX manages this aliasing: if the input
@@ -694,7 +721,7 @@ def _healpix_fft_cuda_lowering(ctx, f, *, L, nside, reality, fft_type, norm, adj
             "healpix_fft_cuda_c64", operand_output_aliases={0: 0}
         )
 
-    # Step 5: Call the FFI lowering function with the context and parameters.
+    # Step 4: Call the FFI lowering function with the context and parameters.
     return ffi_lowered(
         ctx,
         f,
@@ -806,9 +833,10 @@ def _healpix_fft_cuda_transpose(
     )
 
 
-# Register healpfix_fft_cuda custom call target
-for name, fn in _s2fft.registration().items():
-    jax.ffi.register_ffi_target(name, fn, platform="CUDA")
+if _s2fft is not None:
+    # Register healpfix_fft_cuda custom call target
+    for name, fn in _s2fft.registration().items():
+        jax.ffi.register_ffi_target(name, fn, platform="CUDA")
 
 # Step 1: Register the HEALPix FFT CUDA primitive with JAX.
 _healpix_fft_cuda_primitive = register_primitive(
@@ -846,6 +874,7 @@ def healpix_fft_cuda(
         jnp.ndarray: Array of Fourier coefficients for all latitudes.
 
     """
+    _check_extension_module()
     # Step 1: Promote input data to complex dtype if necessary.
     (f,) = promote_dtypes_complex(f)
     # Step 2: Bind the input to the CUDA primitive. It returns multiple outputs (input_alias, out, workspace).
@@ -886,6 +915,7 @@ def healpix_ifft_cuda(
         jnp.ndarray: HEALPix pixel-space array.
 
     """
+    _check_extension_module()
     # Step 1: Promote input data to complex dtype if necessary.
     (ftm,) = promote_dtypes_complex(ftm)
     # Step 2: Bind the input to the CUDA primitive. It returns multiple outputs (input_alias, out, workspace).
