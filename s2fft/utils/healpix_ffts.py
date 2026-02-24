@@ -557,6 +557,13 @@ def ring_phase_shifts_hp_jax(
 # Custom healpix_fft_cuda primitive
 
 
+def _register_ffi_targets() -> None:
+    """Register custom call targets for HEALPix FFTs."""
+    if _s2fft is not None:
+        for name, fn in _s2fft.registration().items():
+            jax.ffi.register_ffi_target(name, fn, platform="CUDA")
+
+
 def _get_lowering_info(fft_type, norm, out_dtype):
     # Step 1: Determine if double precision is used based on output dtype.
     if out_dtype == np.complex64:
@@ -833,23 +840,6 @@ def _healpix_fft_cuda_transpose(
     )
 
 
-if _s2fft is not None:
-    # Register healpfix_fft_cuda custom call target
-    for name, fn in _s2fft.registration().items():
-        jax.ffi.register_ffi_target(name, fn, platform="CUDA")
-
-# Step 1: Register the HEALPix FFT CUDA primitive with JAX.
-_healpix_fft_cuda_primitive = register_primitive(
-    "healpix_fft_cuda",
-    multiple_results=True,  # Indicates that the primitive returns multiple outputs.
-    abstract_evaluation=_healpix_fft_cuda_abstract,
-    lowering_per_platform={"cuda": _healpix_fft_cuda_lowering},
-    transpose=_healpix_fft_cuda_transpose,
-    batcher=_healpix_fft_cuda_batching_rule,
-    is_linear=True,
-)
-
-
 @partial(jit, static_argnums=(1, 2, 3))
 def healpix_fft_cuda(
     f: jnp.ndarray, L: int, nside: int, reality: bool, norm: str = "backward"
@@ -931,6 +921,19 @@ def healpix_ifft_cuda(
     # Step 3: Return only the primary output (pixel-space array).
     return out
 
+
+# Register the HEALPix FFT CUDA primitive with JAX.
+_register_ffi_targets()
+
+_healpix_fft_cuda_primitive = register_primitive(
+    "healpix_fft_cuda",
+    multiple_results=True,  # Indicates that the primitive returns multiple outputs.
+    abstract_evaluation=_healpix_fft_cuda_abstract,
+    lowering_per_platform={"cuda": _healpix_fft_cuda_lowering},
+    transpose=_healpix_fft_cuda_transpose,
+    batcher=_healpix_fft_cuda_batching_rule,
+    is_linear=True,
+)
 
 _healpix_fft_functions = {
     "numpy": healpix_fft_numpy,
