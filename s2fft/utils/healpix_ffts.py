@@ -21,6 +21,7 @@ except ImportError:
     _s2fft = None
 
 from s2fft.sampling import s2_samples as samples
+from s2fft.utils._dtype_association import compatible_complex_dtype
 from s2fft.utils.jax_primitive import register_primitive
 from s2fft.utils.torch_wrapper import wrap_as_torch_function
 
@@ -111,7 +112,7 @@ def spectral_periodic_extension(fm: np.ndarray, nphi: int, L: int) -> np.ndarray
 
     slice_start = L - nphi // 2
     slice_stop = slice_start + nphi
-    fm_full = np.zeros(2 * L, dtype=np.complex128)
+    fm_full = np.zeros(2 * L, dtype=compatible_complex_dtype(fm))
     fm_full[slice_start:slice_stop] = fm
 
     idx = 1
@@ -212,13 +213,14 @@ def healpix_fft_numpy(f: np.ndarray, L: int, nside: int, reality: bool) -> np.nd
         np.ndarray: Array of Fourier coefficients for all latitudes.
 
     """
+    compat_dtype = compatible_complex_dtype(f)
     index = 0
-    ftm = np.zeros(samples.ftm_shape(L, "healpix", nside), dtype=np.complex128)
+    ftm = np.zeros(samples.ftm_shape(L, "healpix", nside), dtype=compat_dtype)
     ntheta = ftm.shape[0]
     for t in range(ntheta):
         nphi = samples.nphi_ring(t, nside)
         if reality and nphi == 2 * L:
-            fm_chunk = np.zeros(nphi, dtype=np.complex128)
+            fm_chunk = np.zeros(nphi, dtype=compat_dtype)
             fm_chunk[nphi // 2 :] = np.fft.rfft(
                 np.real(f[index : index + nphi]), norm="backward"
             )[:-1]
@@ -257,12 +259,13 @@ def healpix_fft_jax(f: jnp.ndarray, L: int, nside: int, reality: bool) -> jnp.nd
         jnp.ndarray: Array of Fourier coefficients for all latitudes.
 
     """
+    compat_dtype = compatible_complex_dtype(f)
 
     def f_chunks_to_ftm_rows(f_chunks, nphi):
         if reality and nphi == 2 * L:
             fm_chunks = jnp.concatenate(
                 (
-                    jnp.zeros((f_chunks.shape[0], nphi // 2)),
+                    jnp.zeros((f_chunks.shape[0], nphi // 2), dtype=compat_dtype),
                     jnp.fft.rfft(jnp.real(f_chunks), norm="backward")[:, :-1],
                 ),
                 axis=1,

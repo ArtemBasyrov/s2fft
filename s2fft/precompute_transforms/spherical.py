@@ -14,6 +14,7 @@ from s2fft.utils import (
     resampling_jax,
     torch_wrapper,
 )
+from s2fft.utils._dtype_association import compatible_complex_dtype
 
 
 def inverse(
@@ -188,7 +189,9 @@ def inverse_transform_jax(
     m_offset = 1 if sampling in ["mwss", "healpix"] else 0
     m_start_ind = L - 1 if reality else 0
 
-    ftm = jnp.zeros(samples.ftm_shape(L, sampling, nside), dtype=jnp.complex128)
+    ftm = jnp.zeros(
+        samples.ftm_shape(L, sampling, nside), dtype=compatible_complex_dtype(flm)
+    )
     ftm = ftm.at[:, m_start_ind + m_offset :].add(
         jnp.einsum(
             "...tlm, ...lm -> ...tm",
@@ -368,7 +371,7 @@ def forward_transform(
         else:
             ftm = np.fft.fft(f, axis=-1, norm="backward")
             ftm = np.fft.fftshift(ftm, axes=-1)[:, m_offset:]
-    flm = np.zeros(samples.flm_shape(L), dtype=np.complex128)
+    flm = np.zeros(samples.flm_shape(L), dtype=compatible_complex_dtype(f))
     flm[:, m_start_ind:] = np.einsum("...tlm, ...tm -> ...lm", kernel, ftm)
 
     if reality:
@@ -439,7 +442,7 @@ def forward_transform_jax(
             ftm = jnp.fft.fft(f, axis=-1, norm="backward")
             ftm = jnp.fft.fftshift(ftm, axes=-1)[:, m_offset:]
 
-    flm = jnp.zeros(samples.flm_shape(L), dtype=jnp.complex128)
+    flm = jnp.zeros(samples.flm_shape(L), dtype=compatible_complex_dtype(f))
     flm = flm.at[:, m_start_ind:].set(
         jnp.einsum(
             "...tlm, ...tm -> ...lm", kernel.astype(flm.dtype), ftm, optimize=True
