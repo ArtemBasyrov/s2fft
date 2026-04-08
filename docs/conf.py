@@ -14,8 +14,11 @@
 import os
 import sys
 from importlib.metadata import version as get_version
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(".."))
+
+DOCS_DIR = Path(__file__).parent
 
 
 # -- Project information -----------------------------------------------------
@@ -39,19 +42,18 @@ version = ".".join(release.split(".")[:2])
 # ones.
 extensions = [
     "sphinx_copybutton",
-    "nbsphinx_link",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
     "sphinx.ext.githubpages",
     "sphinx_rtd_theme",
-    "nbsphinx",
     "IPython.sphinxext.ipython_console_highlighting",
     "sphinx_tabs.tabs",
     "sphinx_git",
     "sphinxcontrib.texfigure",
     "sphinx.ext.autosectionlabel",
     "sphinxemoji.sphinxemoji",
+    "sphinx_gallery.gen_gallery",
     "sphinx_mdinclude",
 ]
 
@@ -60,9 +62,18 @@ napoleon_google_docstring = True
 napoleon_include_init_with_doc = True
 napoleon_numpy_docstring = False
 
+sphinx_gallery_conf = {
+    "examples_dirs": "../examples",
+    "gallery_dirs": "./tutorials",
+    "filename_pattern": "",
+    # For whatever reason, default_thumb_file is interpreted as
+    # relative to CWD in which build is run, unless an absolute path is provided.
+    "default_thumb_file": str(DOCS_DIR / "assets/sax_logo"),
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
-source_suffix = [".rst", ".ipynb"]
+source_suffix = [".rst"]
 
 # The master toctree document.
 master_doc = "index"

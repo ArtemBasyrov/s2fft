@@ -1,17 +1,14 @@
-:html_theme.sidebar_secondary.remove:
-
-*****************************
 Tutorials
-*****************************
+=========
 
-This section contains a series of tutorial notebooks which go through some of the
+This section contains :ref:`a series of tutorial notebooks <tutorial-notebooks-label>` which go through some of the
 key features of the ``S2FFT`` package.
 
 At a high-level the ``S2FFT`` package is structured such that the two primary transforms,
 the Wigner and spherical harmonic transforms, can easily be accessed.
 
 Core usage |:rocket:|
------------------------------
+---------------------
 
 To import and use ``S2FFT`` is as simple follows: 
 
@@ -33,14 +30,11 @@ To import and use ``S2FFT`` is as simple follows:
 |   f = s2fft.inverse(flm, L, method="jax")             |   f = s2fft.wigner.inverse(flmn, L, N, method="jax")       |
 +-------------------------------------------------------+------------------------------------------------------------+
 
-.. toctree::
-   :hidden:
-   :maxdepth: 3
-   :caption: Tutorials
+.. _tutorial-notebooks-label:
 
-   spherical_harmonic/spherical_harmonic_transform.nblink
-   wigner/wigner_transform.nblink
-   rotation/rotation.nblink
-   torch_frontend/torch_frontend.nblink
-   JAX_SSHT/JAX_SSHT_frontend.nblink
-   JAX_HEALPix/JAX_HEALPix_frontend.nblink
+Tutorial notebooks
+------------------
+
+Below are a few short tutorials that cover how to use specific features of ``S2FFT``.
+
+We also have a notebook demonstrating how to use CUDA-accelerated HEALPix spherical harmonic transforms in ``S2FFT``, which `is accessible in notebook format here <https://github.com/astro-informatics/s2fft/blob/main/notebooks/JAX_CUDA_HEALPix.ipynb>`_, or alternatively can be `opened in Google Colab <https://colab.research.google.com/github/astro-informatics/s2fft/blob/main/notebooks/JAX_CUDA_HEALPix.ipynb>`_.
