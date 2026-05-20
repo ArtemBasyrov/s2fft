@@ -82,7 +82,8 @@ def _underlying_forward(
 
 
 def _apply_with_batching(fn_unbatched, data, spin, precomps):
-    """Call ``fn_unbatched(data2d, spin0d, precomps_or_None)`` over leading
+    """
+    Call ``fn_unbatched(data2d, spin0d, precomps_or_None)`` over leading
     batch dims. ``data`` is 2D + batch, ``spin`` is 0d + same batch, each
     precomp array also has the same number of leading batch dims as ``data``.
     """
@@ -191,8 +192,10 @@ def _flm_to_ftm_transpose(
 
 
 def _lift_to_batch(arr, ax, batch_size):
-    """Move axis ``ax`` to position 0, or broadcast to a leading batch dim
-    of size ``batch_size`` if ``ax is None``."""
+    """
+    Move axis ``ax`` to position 0, or broadcast to a leading batch dim
+    of size ``batch_size`` if ``ax is None``.
+    """
     if ax is None:
         return jnp.broadcast_to(arr, (batch_size,) + arr.shape)
     return jnp.moveaxis(arr, ax, 0)
@@ -217,7 +220,9 @@ def _flm_to_ftm_batcher(
         L_lower=L_lower,
     )
     # Identify batch size from the first batched operand.
-    arrays_axes = [(flm, flm_ax), (spin, spin_ax)] + list(zip(precomps, precomps_ax))
+    arrays_axes = [(flm, flm_ax), (spin, spin_ax)] + list(
+        zip(precomps, precomps_ax, strict=False)
+    )
     batch_size = next(
         (arr.shape[ax] for arr, ax in arrays_axes if ax is not None),
         None,
@@ -227,7 +232,8 @@ def _flm_to_ftm_batcher(
     flm_b = _lift_to_batch(flm, flm_ax, batch_size)
     spin_b = _lift_to_batch(spin, spin_ax, batch_size)
     precomps_b = tuple(
-        _lift_to_batch(p, ax, batch_size) for p, ax in zip(precomps, precomps_ax)
+        _lift_to_batch(p, ax, batch_size)
+        for p, ax in zip(precomps, precomps_ax, strict=False)
     )
     return _flm_to_ftm_primitive.bind(flm_b, thetas, spin_b, *precomps_b, **params), 0
 
@@ -352,7 +358,9 @@ def _ftm_to_flm_batcher(
         spmd=spmd,
         L_lower=L_lower,
     )
-    arrays_axes = [(ftm, ftm_ax), (spin, spin_ax)] + list(zip(precomps, precomps_ax))
+    arrays_axes = [(ftm, ftm_ax), (spin, spin_ax)] + list(
+        zip(precomps, precomps_ax, strict=False)
+    )
     batch_size = next(
         (arr.shape[ax] for arr, ax in arrays_axes if ax is not None),
         None,
@@ -362,7 +370,8 @@ def _ftm_to_flm_batcher(
     ftm_b = _lift_to_batch(ftm, ftm_ax, batch_size)
     spin_b = _lift_to_batch(spin, spin_ax, batch_size)
     precomps_b = tuple(
-        _lift_to_batch(p, ax, batch_size) for p, ax in zip(precomps, precomps_ax)
+        _lift_to_batch(p, ax, batch_size)
+        for p, ax in zip(precomps, precomps_ax, strict=False)
     )
     return _ftm_to_flm_primitive.bind(ftm_b, thetas, spin_b, *precomps_b, **params), 0
 
@@ -387,8 +396,10 @@ _ftm_to_flm_primitive = register_primitive(
 
 
 def _as_spin_operand(spin) -> jnp.ndarray:
-    """Normalize ``spin`` to a 0-d int JAX array. Accepts Python ints,
-    numpy scalars or existing JAX tracers / arrays."""
+    """
+    Normalize ``spin`` to a 0-d int JAX array. Accepts Python ints,
+    numpy scalars or existing JAX tracers / arrays.
+    """
     return jnp.asarray(spin, dtype=jnp.int64)
 
 
@@ -405,7 +416,8 @@ def flm_to_ftm(
     L_lower: int,
     precomps: list | None = None,
 ) -> jnp.ndarray:
-    """Inverse latitudinal step (``flm -> ftm``) via custom JAX primitive.
+    """
+    Inverse latitudinal step (``flm -> ftm``) via custom JAX primitive.
 
     If ``precomps`` is None the underlying function regenerates them at
     trace time; this matches the behaviour of
@@ -439,7 +451,8 @@ def ftm_to_flm(
     L_lower: int,
     precomps: list | None = None,
 ) -> jnp.ndarray:
-    """Forward latitudinal step (``ftm -> flm``) via custom JAX primitive.
+    """
+    Forward latitudinal step (``ftm -> flm``) via custom JAX primitive.
 
     If ``precomps`` is None the underlying function regenerates them at
     trace time; this matches the behaviour of
