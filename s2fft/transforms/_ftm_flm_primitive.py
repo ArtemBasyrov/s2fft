@@ -69,6 +69,37 @@ def _untuplify_precomps(precomps: tuple) -> list | None:
     return list(precomps) if precomps else None
 
 
+def _batch_primitive(primitive, batched_args, batch_axes, **params):
+    """
+    Batch ftm_to_flm or flm_to_ftm primitive given batched_args with first
+    argument corresponding to either ftm or flm array (fxm used as placeholder).
+    """
+    fxm, thetas, spin, *precomps = batched_args
+    fxm_ax, thetas_ax, spin_ax, *precomps_ax = batch_axes
+    if thetas_ax is not None:
+        raise NotImplementedError(
+            "vmap over `thetas` is not supported (it is determined by the "
+            "static sampling configuration)."
+        )
+    # Identify batch size from the first batched operand.
+    arrays_axes = [(fxm, fxm_ax), (spin, spin_ax)] + list(
+        zip(precomps, precomps_ax, strict=False)
+    )
+    batch_size = next(
+        (arr.shape[ax] for arr, ax in arrays_axes if ax is not None),
+        None,
+    )
+    if batch_size is None:
+        return primitive.bind(fxm, thetas, spin, *precomps, **params), None
+    fxm_b = _lift_to_batch(fxm, fxm_ax, batch_size)
+    spin_b = _lift_to_batch(spin, spin_ax, batch_size)
+    precomps_b = tuple(
+        _lift_to_batch(p, ax, batch_size)
+        for p, ax in zip(precomps, precomps_ax, strict=False)
+    )
+    return primitive.bind(fxm_b, thetas, spin_b, *precomps_b, **params), 0
+
+
 # ---------------------------------------------------------------------------
 # flm_to_ftm primitive (inverse latitudinal step)
 # ---------------------------------------------------------------------------
@@ -129,30 +160,7 @@ def _lift_to_batch(arr, ax, batch_size):
 
 
 def _flm_to_ftm_batcher(batched_args, batch_axes, **params):
-    flm, thetas, spin, *precomps = batched_args
-    flm_ax, thetas_ax, spin_ax, *precomps_ax = batch_axes
-    if thetas_ax is not None:
-        raise NotImplementedError(
-            "vmap over `thetas` is not supported (it is determined by the "
-            "static sampling configuration)."
-        )
-    # Identify batch size from the first batched operand.
-    arrays_axes = [(flm, flm_ax), (spin, spin_ax)] + list(
-        zip(precomps, precomps_ax, strict=False)
-    )
-    batch_size = next(
-        (arr.shape[ax] for arr, ax in arrays_axes if ax is not None),
-        None,
-    )
-    if batch_size is None:
-        return _flm_to_ftm_primitive.bind(flm, thetas, spin, *precomps, **params), None
-    flm_b = _lift_to_batch(flm, flm_ax, batch_size)
-    spin_b = _lift_to_batch(spin, spin_ax, batch_size)
-    precomps_b = tuple(
-        _lift_to_batch(p, ax, batch_size)
-        for p, ax in zip(precomps, precomps_ax, strict=False)
-    )
-    return _flm_to_ftm_primitive.bind(flm_b, thetas, spin_b, *precomps_b, **params), 0
+    return _batch_primitive(_flm_to_ftm_primitive, batched_args, batch_axes, **params)
 
 
 _flm_to_ftm_primitive = register_primitive(
@@ -216,29 +224,7 @@ def _ftm_to_flm_transpose(cotangent, ftm, thetas, spin, *precomps, **params):
 
 
 def _ftm_to_flm_batcher(batched_args, batch_axes, **params):
-    ftm, thetas, spin, *precomps = batched_args
-    ftm_ax, thetas_ax, spin_ax, *precomps_ax = batch_axes
-    if thetas_ax is not None:
-        raise NotImplementedError(
-            "vmap over `thetas` is not supported (it is determined by the "
-            "static sampling configuration)."
-        )
-    arrays_axes = [(ftm, ftm_ax), (spin, spin_ax)] + list(
-        zip(precomps, precomps_ax, strict=False)
-    )
-    batch_size = next(
-        (arr.shape[ax] for arr, ax in arrays_axes if ax is not None),
-        None,
-    )
-    if batch_size is None:
-        return _ftm_to_flm_primitive.bind(ftm, thetas, spin, *precomps, **params), None
-    ftm_b = _lift_to_batch(ftm, ftm_ax, batch_size)
-    spin_b = _lift_to_batch(spin, spin_ax, batch_size)
-    precomps_b = tuple(
-        _lift_to_batch(p, ax, batch_size)
-        for p, ax in zip(precomps, precomps_ax, strict=False)
-    )
-    return _ftm_to_flm_primitive.bind(ftm_b, thetas, spin_b, *precomps_b, **params), 0
+    return _batch_primitive(_ftm_to_flm_primitive, batched_args, batch_axes, **params)
 
 
 _ftm_to_flm_primitive = register_primitive(
