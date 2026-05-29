@@ -98,35 +98,15 @@ def _flm_to_ftm_impl(
     return _apply_with_batching(fn, flm, spin, precomps)
 
 
-def _flm_to_ftm_jvp(primals, tangents, *, L, nside, sampling, reality, spmd, L_lower):
+def _flm_to_ftm_jvp(primals, tangents, **params):
     flm, thetas, spin, *precomps = primals
     flm_t, *_ = tangents
-    primal_out = _flm_to_ftm_primitive.bind(
-        flm,
-        thetas,
-        spin,
-        *precomps,
-        L=L,
-        nside=nside,
-        sampling=sampling,
-        reality=reality,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
+    primal_out = _flm_to_ftm_primitive.bind(flm, thetas, spin, *precomps, **params)
     if isinstance(flm_t, jax.interpreters.ad.Zero):
         tangent_out = jax.interpreters.ad.Zero(primal_out.aval)
     else:
         tangent_out = _flm_to_ftm_primitive.bind(
-            flm_t,
-            thetas,
-            spin,
-            *precomps,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
-            spmd=spmd,
-            L_lower=L_lower,
+            flm_t, thetas, spin, *precomps, **params
         )
     return primal_out, tangent_out
 
@@ -240,35 +220,15 @@ def _ftm_to_flm_impl(
     return _apply_with_batching(fn, ftm, spin, precomps)
 
 
-def _ftm_to_flm_jvp(primals, tangents, *, L, nside, sampling, reality, spmd, L_lower):
+def _ftm_to_flm_jvp(primals, tangents, **params):
     ftm, thetas, spin, *precomps = primals
     ftm_t, *_ = tangents
-    primal_out = _ftm_to_flm_primitive.bind(
-        ftm,
-        thetas,
-        spin,
-        *precomps,
-        L=L,
-        nside=nside,
-        sampling=sampling,
-        reality=reality,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
+    primal_out = _ftm_to_flm_primitive.bind(ftm, thetas, spin, *precomps, **params)
     if isinstance(ftm_t, jax.interpreters.ad.Zero):
         tangent_out = jax.interpreters.ad.Zero(primal_out.aval)
     else:
         tangent_out = _ftm_to_flm_primitive.bind(
-            ftm_t,
-            thetas,
-            spin,
-            *precomps,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
-            spmd=spmd,
-            L_lower=L_lower,
+            ftm_t, thetas, spin, *precomps, **params
         )
     return primal_out, tangent_out
 
