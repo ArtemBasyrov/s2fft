@@ -78,21 +78,10 @@ def _flm_to_ftm_abstract(
     return ShapedArray(out_shape, flm.dtype)
 
 
-def _flm_to_ftm_impl(
-    flm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
-):
+def _flm_to_ftm_impl(flm, thetas, spin, *precomps, **params):
     def fn(d, s, p):
         return otf.inverse_latitudinal_step_jax(
-            d,
-            thetas,
-            L,
-            s,
-            nside,
-            sampling,
-            reality,
-            precomps=p,
-            spmd=spmd,
-            L_lower=L_lower,
+            flm=d, beta=thetas, spin=s, precomps=p, **params
         )
 
     return _apply_with_batching(fn, flm, spin, precomps)
@@ -111,9 +100,7 @@ def _flm_to_ftm_jvp(primals, tangents, **params):
     return primal_out, tangent_out
 
 
-def _flm_to_ftm_transpose(
-    cotangent, flm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
-):
+def _flm_to_ftm_transpose(cotangent, flm, thetas, spin, *precomps, **params):
     # ``flm`` arrives as an UndefinedPrimal; ``thetas``, ``spin`` and
     # ``precomps`` are concrete residuals. The transpose of the inverse step
     # is the forward step. We pass ``precomps=None`` so it regenerates the
@@ -121,16 +108,7 @@ def _flm_to_ftm_transpose(
     # inverse direction).
     def fn(c, s, _ignored_p):
         return otf.forward_latitudinal_step_jax(
-            c,
-            thetas,
-            L,
-            s,
-            nside,
-            sampling,
-            reality,
-            precomps=None,
-            spmd=spmd,
-            L_lower=L_lower,
+            ftm_in=c, beta_in=thetas, spin=s, precomps=None, **params
         )
 
     cot_flm = _apply_with_batching(fn, cotangent, spin, precomps)
@@ -200,21 +178,10 @@ def _ftm_to_flm_abstract(
     return ShapedArray(out_shape, ftm.dtype)
 
 
-def _ftm_to_flm_impl(
-    ftm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
-):
+def _ftm_to_flm_impl(ftm, thetas, spin, *precomps, **params):
     def fn(d, s, p):
         return otf.forward_latitudinal_step_jax(
-            d,
-            thetas,
-            L,
-            s,
-            nside,
-            sampling,
-            reality,
-            precomps=p,
-            spmd=spmd,
-            L_lower=L_lower,
+            ftm_in=d, beta_in=thetas, spin=s, precomps=p, **params
         )
 
     return _apply_with_batching(fn, ftm, spin, precomps)
@@ -233,23 +200,12 @@ def _ftm_to_flm_jvp(primals, tangents, **params):
     return primal_out, tangent_out
 
 
-def _ftm_to_flm_transpose(
-    cotangent, ftm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
-):
+def _ftm_to_flm_transpose(cotangent, ftm, thetas, spin, *precomps, **params):
     # The transpose of the forward step is the inverse step. We pass
     # ``precomps=None`` so it regenerates the inverse-direction precomps.
     def fn(c, s, _ignored_p):
         return otf.inverse_latitudinal_step_jax(
-            c,
-            thetas,
-            L,
-            s,
-            nside,
-            sampling,
-            reality,
-            precomps=None,
-            spmd=spmd,
-            L_lower=L_lower,
+            flm=c, beta=thetas, spin=s, precomps=None, **params
         )
 
     cot_ftm = _apply_with_batching(fn, cotangent, spin, precomps)
