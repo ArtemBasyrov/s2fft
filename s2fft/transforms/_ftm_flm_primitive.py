@@ -54,16 +54,19 @@ def _apply_with_batching(fn_unbatched, data, spin, precomps):
     precomp array also has the same number of leading batch dims as ``data``.
     """
     n_batch = data.ndim - _DATA_NDIM
-
-    def single(d, s, *ps):
-        precomps_arg = list(ps) if ps else None
-        return fn_unbatched(d, s, precomps_arg)
-
-    inner = single
-    in_axes = (0, 0) + (0,) * len(precomps)
+    inner = fn_unbatched
+    in_axes = (0, 0, (0,) * len(precomps))
     for _ in range(n_batch):
         inner = jax.vmap(inner, in_axes=in_axes)
-    return inner(data, spin, *precomps)
+    return inner(data, spin, precomps)
+
+
+def _tuplify_precomps(precomps: list | None) -> tuple:
+    return tuple(precomps) if precomps is not None else ()
+
+
+def _untuplify_precomps(precomps: tuple) -> list | None:
+    return list(precomps) if precomps else None
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +84,7 @@ def _flm_to_ftm_abstract(
 def _flm_to_ftm_impl(flm, thetas, spin, *precomps, **params):
     def fn(d, s, p):
         return otf.inverse_latitudinal_step_jax(
-            flm=d, beta=thetas, spin=s, precomps=p, **params
+            flm=d, beta=thetas, spin=s, precomps=_untuplify_precomps(p), **params
         )
 
     return _apply_with_batching(fn, flm, spin, precomps)
@@ -181,7 +184,7 @@ def _ftm_to_flm_abstract(
 def _ftm_to_flm_impl(ftm, thetas, spin, *precomps, **params):
     def fn(d, s, p):
         return otf.forward_latitudinal_step_jax(
-            ftm_in=d, beta_in=thetas, spin=s, precomps=p, **params
+            ftm_in=d, beta_in=thetas, spin=s, precomps=_untuplify_precomps(p), **params
         )
 
     return _apply_with_batching(fn, ftm, spin, precomps)
@@ -285,12 +288,11 @@ def flm_to_ftm(
     trace time; this matches the behaviour of
     :func:`otf.inverse_latitudinal_step_jax`.
     """
-    precomps_args = tuple(precomps) if precomps is not None else ()
     return _flm_to_ftm_primitive.bind(
         flm,
         thetas,
         _as_spin_operand(spin),
-        *precomps_args,
+        *_tuplify_precomps(precomps),
         L=L,
         nside=nside,
         sampling=sampling,
@@ -320,12 +322,11 @@ def ftm_to_flm(
     trace time; this matches the behaviour of
     :func:`otf.forward_latitudinal_step_jax`.
     """
-    precomps_args = tuple(precomps) if precomps is not None else ()
     return _ftm_to_flm_primitive.bind(
         ftm,
         thetas,
         _as_spin_operand(spin),
-        *precomps_args,
+        *_tuplify_precomps(precomps),
         L=L,
         nside=nside,
         sampling=sampling,
