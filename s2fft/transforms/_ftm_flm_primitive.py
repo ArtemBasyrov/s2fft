@@ -47,6 +47,11 @@ from s2fft.utils.jax_primitive import register_primitive
 _DATA_NDIM = 2
 
 
+# ---------------------------------------------------------------------------
+# Helper functions for constructing primitives
+# ---------------------------------------------------------------------------
+
+
 def _apply_with_batching(fn_unbatched, data, spin, precomps):
     """
     Call ``fn_unbatched(data2d, spin0d, precomps_or_None)`` over leading
@@ -67,6 +72,24 @@ def _tuplify_precomps(precomps: list | None) -> tuple:
 
 def _untuplify_precomps(precomps: tuple) -> list | None:
     return list(precomps) if precomps else None
+
+
+def _as_spin_operand(spin) -> jnp.ndarray:
+    """
+    Normalize ``spin`` to a 0-d int JAX array. Accepts Python ints,
+    numpy scalars or existing JAX tracers / arrays.
+    """
+    return jnp.asarray(spin, dtype=jnp.int64)
+
+
+def _lift_to_batch(arr, ax, batch_size):
+    """
+    Move axis ``ax`` to position 0, or broadcast to a leading batch dim
+    of size ``batch_size`` if ``ax is None``.
+    """
+    if ax is None:
+        return jnp.broadcast_to(arr, (batch_size,) + arr.shape)
+    return jnp.moveaxis(arr, ax, 0)
 
 
 def _batch_primitive(primitive, batched_args, batch_axes, **params):
@@ -147,16 +170,6 @@ def _flm_to_ftm_transpose(cotangent, flm, thetas, spin, *precomps, **params):
 
     cot_flm = _apply_with_batching(fn, cotangent, spin, precomps)
     return (cot_flm, None, None) + (None,) * len(precomps)
-
-
-def _lift_to_batch(arr, ax, batch_size):
-    """
-    Move axis ``ax`` to position 0, or broadcast to a leading batch dim
-    of size ``batch_size`` if ``ax is None``.
-    """
-    if ax is None:
-        return jnp.broadcast_to(arr, (batch_size,) + arr.shape)
-    return jnp.moveaxis(arr, ax, 0)
 
 
 def _flm_to_ftm_batcher(batched_args, batch_axes, **params):
@@ -244,14 +257,6 @@ _ftm_to_flm_primitive = register_primitive(
 # ---------------------------------------------------------------------------
 # Public wrappers
 # ---------------------------------------------------------------------------
-
-
-def _as_spin_operand(spin) -> jnp.ndarray:
-    """
-    Normalize ``spin`` to a 0-d int JAX array. Accepts Python ints,
-    numpy scalars or existing JAX tracers / arrays.
-    """
-    return jnp.asarray(spin, dtype=jnp.int64)
 
 
 def flm_to_ftm(
