@@ -47,40 +47,6 @@ from s2fft.utils.jax_primitive import register_primitive
 _DATA_NDIM = 2
 
 
-def _underlying_inverse(
-    flm, thetas, spin, precomps, *, L, nside, sampling, reality, spmd, L_lower
-):
-    return otf.inverse_latitudinal_step_jax(
-        flm,
-        thetas,
-        L,
-        spin,
-        nside,
-        sampling,
-        reality,
-        precomps=precomps,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
-
-
-def _underlying_forward(
-    ftm, thetas, spin, precomps, *, L, nside, sampling, reality, spmd, L_lower
-):
-    return otf.forward_latitudinal_step_jax(
-        ftm,
-        thetas,
-        L,
-        spin,
-        nside,
-        sampling,
-        reality,
-        precomps=precomps,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
-
-
 def _apply_with_batching(fn_unbatched, data, spin, precomps):
     """
     Call ``fn_unbatched(data2d, spin0d, precomps_or_None)`` over leading
@@ -116,15 +82,15 @@ def _flm_to_ftm_impl(
     flm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
 ):
     def fn(d, s, p):
-        return _underlying_inverse(
+        return otf.inverse_latitudinal_step_jax(
             d,
             thetas,
+            L,
             s,
-            p,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
+            nside,
+            sampling,
+            reality,
+            precomps=p,
             spmd=spmd,
             L_lower=L_lower,
         )
@@ -174,15 +140,15 @@ def _flm_to_ftm_transpose(
     # forward-direction precomps internally (the supplied ones are for the
     # inverse direction).
     def fn(c, s, _ignored_p):
-        return _underlying_forward(
+        return otf.forward_latitudinal_step_jax(
             c,
             thetas,
+            L,
             s,
-            None,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
+            nside,
+            sampling,
+            reality,
+            precomps=None,
             spmd=spmd,
             L_lower=L_lower,
         )
@@ -268,15 +234,15 @@ def _ftm_to_flm_impl(
     ftm, thetas, spin, *precomps, L, nside, sampling, reality, spmd, L_lower
 ):
     def fn(d, s, p):
-        return _underlying_forward(
+        return otf.forward_latitudinal_step_jax(
             d,
             thetas,
+            L,
             s,
-            p,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
+            nside,
+            sampling,
+            reality,
+            precomps=p,
             spmd=spmd,
             L_lower=L_lower,
         )
@@ -323,15 +289,15 @@ def _ftm_to_flm_transpose(
     # The transpose of the forward step is the inverse step. We pass
     # ``precomps=None`` so it regenerates the inverse-direction precomps.
     def fn(c, s, _ignored_p):
-        return _underlying_inverse(
+        return otf.inverse_latitudinal_step_jax(
             c,
             thetas,
+            L,
             s,
-            None,
-            L=L,
-            nside=nside,
-            sampling=sampling,
-            reality=reality,
+            nside,
+            sampling,
+            reality,
+            precomps=None,
             spmd=spmd,
             L_lower=L_lower,
         )
