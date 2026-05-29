@@ -37,8 +37,7 @@ SPIN_TEST = [-2, 0, 1]
 SAMPLING_TEST = ["mw", "mwss", "dh", "gl"]
 
 
-def _make_inputs(L, spin, sampling, reality, rng_seed=0):
-    rng = np.random.default_rng(rng_seed)
+def _make_inputs(rng, L, spin, sampling, reality):
     flm = (
         rng.standard_normal(samples.flm_shape(L))
         + 1j * rng.standard_normal(samples.flm_shape(L))
@@ -61,8 +60,8 @@ def _make_inputs(L, spin, sampling, reality, rng_seed=0):
 
 @pytest.mark.parametrize("spin", SPIN_TEST)
 @pytest.mark.parametrize("sampling", SAMPLING_TEST)
-def test_flm_to_ftm_matches_otf(spin, sampling):
-    flm, _, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+def test_flm_to_ftm_matches_otf(spin, sampling, rng):
+    flm, _, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
     expected = otf.inverse_latitudinal_step_jax(
         flm,
         thetas,
@@ -92,8 +91,8 @@ def test_flm_to_ftm_matches_otf(spin, sampling):
 
 @pytest.mark.parametrize("spin", SPIN_TEST)
 @pytest.mark.parametrize("sampling", SAMPLING_TEST)
-def test_ftm_to_flm_matches_otf(spin, sampling):
-    _, ftm, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+def test_ftm_to_flm_matches_otf(spin, sampling, rng):
+    _, ftm, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
     expected = otf.forward_latitudinal_step_jax(
         ftm,
         thetas,
@@ -122,9 +121,9 @@ def test_ftm_to_flm_matches_otf(spin, sampling):
 
 
 @pytest.mark.parametrize("sampling", SAMPLING_TEST)
-def test_flm_to_ftm_matches_with_explicit_precomps(sampling):
+def test_flm_to_ftm_matches_with_explicit_precomps(sampling, rng):
     spin = 1
-    flm, _, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+    flm, _, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
     precomps = generate_precomputes_jax(
         L_TEST,
         spin,
@@ -168,8 +167,8 @@ def test_flm_to_ftm_matches_with_explicit_precomps(sampling):
 
 @pytest.mark.parametrize("spin", SPIN_TEST)
 @pytest.mark.parametrize("sampling", SAMPLING_TEST)
-def test_flm_to_ftm_grad(spin, sampling):
-    flm, _, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+def test_flm_to_ftm_grad(spin, sampling, rng):
+    flm, _, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
 
     def flm_to_ftm(flm):
         return ftm_flm_prim.flm_to_ftm(
@@ -190,8 +189,8 @@ def test_flm_to_ftm_grad(spin, sampling):
 
 @pytest.mark.parametrize("spin", SPIN_TEST)
 @pytest.mark.parametrize("sampling", SAMPLING_TEST)
-def test_ftm_to_flm_grad(spin, sampling):
-    _, ftm, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+def test_ftm_to_flm_grad(spin, sampling, rng):
+    _, ftm, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
 
     def ftm_to_flm(ftm):
         return ftm_flm_prim.ftm_to_flm(
@@ -211,13 +210,13 @@ def test_ftm_to_flm_grad(spin, sampling):
     check_grads(ftm_to_flm, (ftm,), order=1, modes=("fwd", "rev"))
 
 
-def test_grad_matches_direct_otf_call():
+def test_grad_matches_direct_otf_call(rng):
     """The gradient via our primitive must match the gradient via a manual
     custom_vjp around the same underlying functions, which is the formula
     used by the original code."""
     spin = 1
     sampling = "mw"
-    flm, _, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
+    flm, _, thetas = _make_inputs(rng, L_TEST, spin, sampling, reality=False)
     glm = jnp.asarray(
         np.random.default_rng(7).standard_normal(samples.ftm_shape(L_TEST, sampling))
         + 1j
@@ -269,11 +268,10 @@ def test_grad_matches_direct_otf_call():
 
 
 @pytest.mark.parametrize("sampling", ["mw", "healpix"])
-def test_flm_to_ftm_vmap_matches_loop(sampling):
+def test_flm_to_ftm_vmap_matches_loop(sampling, rng):
     spin = 0
     nside = 4 if sampling == "healpix" else None
     L = 2 * nside if sampling == "healpix" else L_TEST
-    rng = np.random.default_rng(0)
     batch = 3
     flms = (
         rng.standard_normal((batch,) + samples.flm_shape(L))
@@ -302,11 +300,10 @@ def test_flm_to_ftm_vmap_matches_loop(sampling):
 
 
 @pytest.mark.parametrize("sampling", ["mw", "healpix"])
-def test_ftm_to_flm_vmap_matches_loop(sampling):
+def test_ftm_to_flm_vmap_matches_loop(sampling, rng):
     spin = 0
     nside = 4 if sampling == "healpix" else None
     L = 2 * nside if sampling == "healpix" else L_TEST
-    rng = np.random.default_rng(1)
     batch = 3
     ftms = (
         rng.standard_normal((batch,) + samples.ftm_shape(L, sampling, nside))
@@ -339,11 +336,10 @@ def test_ftm_to_flm_vmap_matches_loop(sampling):
 # ---------------------------------------------------------------------------
 
 
-def test_grad_of_vmap_flm_to_ftm():
+def test_grad_of_vmap_flm_to_ftm(rng):
     spin = 0
     sampling = "mw"
     L = L_TEST
-    rng = np.random.default_rng(2)
     batch = 3
     flms = jnp.asarray(
         rng.standard_normal((batch,) + samples.flm_shape(L))
@@ -397,11 +393,10 @@ def test_grad_of_vmap_flm_to_ftm():
     )
 
 
-def test_vmap_of_grad_ftm_to_flm():
+def test_vmap_of_grad_ftm_to_flm(rng):
     spin = 0
     sampling = "mw"
     L = L_TEST
-    rng = np.random.default_rng(3)
     batch = 3
     ftms = jnp.asarray(
         rng.standard_normal((batch,) + samples.ftm_shape(L, sampling))
@@ -453,8 +448,7 @@ def _spin_valid_flm(rng, L, spin):
 @pytest.mark.parametrize("spin", [0, 1])
 @pytest.mark.parametrize("sampling", ["mw", "mwss", "dh", "gl"])
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-def test_inverse_jax_matches_inverse_numpy(spin, sampling):
-    rng = np.random.default_rng(42)
+def test_inverse_jax_matches_inverse_numpy(spin, sampling, rng):
     L = L_TEST
     flm = _spin_valid_flm(rng, L, spin)
     expected = spherical.inverse_numpy(flm, L, spin=spin, sampling=sampling)
@@ -465,8 +459,7 @@ def test_inverse_jax_matches_inverse_numpy(spin, sampling):
 @pytest.mark.parametrize("spin", [0, 1])
 @pytest.mark.parametrize("sampling", ["mw", "mwss", "dh", "gl"])
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-def test_forward_jax_matches_forward_numpy(spin, sampling):
-    rng = np.random.default_rng(43)
+def test_forward_jax_matches_forward_numpy(spin, sampling, rng):
     L = L_TEST
     flm = _spin_valid_flm(rng, L, spin)
     f = spherical.inverse_numpy(flm, L, spin=spin, sampling=sampling)
