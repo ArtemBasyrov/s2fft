@@ -167,9 +167,7 @@ def _lift_to_batch(arr, ax, batch_size):
     return jnp.moveaxis(arr, ax, 0)
 
 
-def _flm_to_ftm_batcher(
-    batched_args, batch_axes, *, L, nside, sampling, reality, spmd, L_lower
-):
+def _flm_to_ftm_batcher(batched_args, batch_axes, **params):
     flm, thetas, spin, *precomps = batched_args
     flm_ax, thetas_ax, spin_ax, *precomps_ax = batch_axes
     if thetas_ax is not None:
@@ -177,14 +175,6 @@ def _flm_to_ftm_batcher(
             "vmap over `thetas` is not supported (it is determined by the "
             "static sampling configuration)."
         )
-    params = dict(
-        L=L,
-        nside=nside,
-        sampling=sampling,
-        reality=reality,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
     # Identify batch size from the first batched operand.
     arrays_axes = [(flm, flm_ax), (spin, spin_ax)] + list(
         zip(precomps, precomps_ax, strict=False)
@@ -306,9 +296,7 @@ def _ftm_to_flm_transpose(
     return (cot_ftm, None, None) + (None,) * len(precomps)
 
 
-def _ftm_to_flm_batcher(
-    batched_args, batch_axes, *, L, nside, sampling, reality, spmd, L_lower
-):
+def _ftm_to_flm_batcher(batched_args, batch_axes, **params):
     ftm, thetas, spin, *precomps = batched_args
     ftm_ax, thetas_ax, spin_ax, *precomps_ax = batch_axes
     if thetas_ax is not None:
@@ -316,14 +304,6 @@ def _ftm_to_flm_batcher(
             "vmap over `thetas` is not supported (it is determined by the "
             "static sampling configuration)."
         )
-    params = dict(
-        L=L,
-        nside=nside,
-        sampling=sampling,
-        reality=reality,
-        spmd=spmd,
-        L_lower=L_lower,
-    )
     arrays_axes = [(ftm, ftm_ax), (spin, spin_ax)] + list(
         zip(precomps, precomps_ax, strict=False)
     )
