@@ -171,8 +171,8 @@ def test_flm_to_ftm_matches_with_explicit_precomps(sampling):
 def test_flm_to_ftm_grad(spin, sampling):
     flm, _, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
 
-    def loss(flm):
-        ftm = ftm_flm_prim.flm_to_ftm(
+    def flm_to_ftm(flm):
+        return ftm_flm_prim.flm_to_ftm(
             flm,
             thetas,
             L=L_TEST,
@@ -184,9 +184,8 @@ def test_flm_to_ftm_grad(spin, sampling):
             L_lower=L_LOWER_TEST,
             precomps=None,
         )
-        return jnp.sum(jnp.abs(ftm) ** 2)
 
-    check_grads(loss, (flm,), order=1, modes=("rev",), atol=1e-3, rtol=1e-3)
+    check_grads(flm_to_ftm, (flm,), order=2, modes=("fwd", "rev"))
 
 
 @pytest.mark.parametrize("spin", SPIN_TEST)
@@ -194,8 +193,8 @@ def test_flm_to_ftm_grad(spin, sampling):
 def test_ftm_to_flm_grad(spin, sampling):
     _, ftm, thetas = _make_inputs(L_TEST, spin, sampling, reality=False)
 
-    def loss(ftm):
-        flm = ftm_flm_prim.ftm_to_flm(
+    def ftm_to_flm(ftm):
+        return ftm_flm_prim.ftm_to_flm(
             ftm,
             thetas,
             L=L_TEST,
@@ -207,9 +206,9 @@ def test_ftm_to_flm_grad(spin, sampling):
             L_lower=L_LOWER_TEST,
             precomps=None,
         )
-        return jnp.sum(jnp.abs(flm) ** 2)
 
-    check_grads(loss, (ftm,), order=1, modes=("rev",), atol=1e-3, rtol=1e-3)
+    # TODO: figure out why this fails for MWSS scheme for order=2
+    check_grads(ftm_to_flm, (ftm,), order=1, modes=("fwd", "rev"))
 
 
 def test_grad_matches_direct_otf_call():
